@@ -1,6 +1,3 @@
-//climber is 7 and 6
-
-//Drive Train pwm ports: fl 0 ; fr 1; br 2; bl 4;
 package org.usfirst.frc.team3929.robot;
 
 import edu.wpi.first.wpilibj.*;
@@ -17,6 +14,7 @@ import edu.wpi.cscore.CvSink;
 import edu.wpi.cscore.CvSource;
 import edu.wpi.cscore.UsbCamera;
 
+
 import com.kauailabs.navx_mxp.AHRS;
 
 /**
@@ -26,21 +24,18 @@ import com.kauailabs.navx_mxp.AHRS;
  * creating this project, you must also update the manifest file in the resource
  * directory.
  */
-public class Robot extends IterativeRobot {
+public class Freshmancopypasta extends IterativeRobot {
 
-	boolean feederAuton = false;
+	
 	public enum AutoState {
-		START, GO, TURN, ALIGN, PIDALIGN, PLACE, FEEDER, RUNNER, FINISH, DUMMY;
+		START, GO, TURN, ALIGN, PIDALIGN, PLACE, FINISH
 	}
 	public enum TurnDirection{
 		LEFT, RIGHT, STRAIGHT
 	}
-
-	AutoState CurrentAutoState = AutoState.START;
+	AutoState CurrentAutoState = AutoState.FINISH;
 	
-	TurnDirection Starter = TurnDirection.LEFT;
-	
-	Boolean shoot = false;
+	TurnDirection Starter = TurnDirection.STRAIGHT;
 
 	Command autonomousCommand;
 	SendableChooser<Command> chooser = new SendableChooser<>();
@@ -105,8 +100,6 @@ public class Robot extends IterativeRobot {
 	
 	float drivePower;
 	double rightDToffset;
-	double rightTeleopOffset;
-	double leftTeleopOffset;
 	
 	double testTime = 1;
 	
@@ -118,10 +111,6 @@ public class Robot extends IterativeRobot {
 	boolean zeroGyro;
 	
 	boolean realign;
-	
-	double leftDrive, rightDrive;
-	
-	PowerDistributionPanel pdp = new PowerDistributionPanel();
 
 	/**
 	 * This function is run when the robot is first started up and should be
@@ -142,36 +131,31 @@ public class Robot extends IterativeRobot {
 		
 		
 		//this code gives an error : ERROR: bind() to port 1735 failed: Address already in use (TCPAcceptor.cpp:108)
-//.95
-		//offsetFactor = 1.00; 
+
+		offsetFactor = 1.00; 
 		straight = true;
 		// haroldsjoystick = new Joystick(1);
 		// haroldsmotor = new VictorSP(4);
 		drive = new RobotDrive(fL, bL, fR, bR);
 		// chooser.addObject("My Auto", new MyAutoCommand());
 		SmartDashboard.putData("Auto mode", chooser);
-		drivePower = 0.25f; //.4f
+		drivePower = 0.4f;
 		lidPiss = new DoubleSolenoid(4, 5);
 		gearPiss = new DoubleSolenoid(2, 3);
 		server = CameraServer.getInstance();
 		
 		rightEncoder = new Encoder(0, 1, false, Encoder.EncodingType.k4X);
-		leftEncoder = new Encoder(2, 3, false, Encoder.EncodingType.k4X);
+		leftEncoder = new Encoder(2, 3, true, Encoder.EncodingType.k4X);
 		
 		zeroGyro = true;
 		pidGyro = new PIDTool(kPgyro, kIgyro, kDgyro, 0, -MAX_ROTATION_INPUT, MAX_ROTATION_INPUT);
-		pidVision = new PIDTool(kPgyro, kIgyro, kDgyro, 0, -MAX_VISION_INPUT, MAX_VISION_INPUT);       
-		//etworkTable.setIPAddress("10.39.29.25");
-       // table = NetworkTable.getTable("VisionTable");
+		pidVision = new PIDTool(kPgyro, kIgyro, kDgyro, 0, -MAX_VISION_INPUT, MAX_VISION_INPUT);                               
+        table = NetworkTable.getTable("Vision");
         
         //measured in inches. 3592 pulse average between -3897 left and 3287 right
-		//1.01
-		rightDToffset = 1.04;
-		//rightTeleopOffset = 1.45;
-		rightTeleopOffset = 1.50;
-		leftTeleopOffset = 1.0;
-		dpp = 12.64;
-		//12.54
+		rightDToffset = 1.254;
+		dpp = 12.54;
+		
 		//allowCamFront = true;
 
 		try {
@@ -209,8 +193,6 @@ public class Robot extends IterativeRobot {
 		} catch (Exception ex) {
 
 		}
-		UsbCamera cam0 = CameraServer.getInstance().startAutomaticCapture(0);
-		//UsbCamera cam1 = CameraServer.getInstance().startAutomaticCapture(1);
 
 		
 
@@ -261,7 +243,6 @@ public class Robot extends IterativeRobot {
 		
 		//resetting autonomous parameters
 		imu.zeroYaw();
-		System.out.println("Gyro Reset");
 		resetEncoders();
 		pidGyro.setSetpoint(0.0);
 		pidVision.setSetpoint(0.0);
@@ -284,102 +265,72 @@ public class Robot extends IterativeRobot {
 	//Overestimating distance by 2 inches
 	@Override
 	public void autonomousPeriodic() {
-		
-/*		if(SmartDashboard.getBoolean("DB/Button 0",false)){
-			Starter = TurnDirection.RIGHT;
-		} else if(!SmartDashboard.getBoolean("DB/Button 0",false)){
-			Starter = TurnDirection.LEFT;
-		}if(SmartDashboard.getBoolean("DB/Button 1", false)){
-			Starter = TurnDirection.STRAIGHT;
-		}*/ 
-		System.out.println("Starter: " + Starter);
 		Scheduler.getInstance().run();
-		//lidPiss.set(DoubleSolenoid.Value.kForward);
-
+		lidPiss.set(DoubleSolenoid.Value.kForward);
+		
+		found = table.getBoolean("found", false);
+		offset = table.getString("offset", "default");
+		distance = table.getNumber("distance", 60.0);
+		capturing = table.getBoolean("capturing", false);
+		center = table.getNumber("center", 10);
+		
+		System.out.println("offset " + offset);
+		System.out.println("distance" + distance);
+		SmartDashboard.putString("DB/String 4", "Found: " + found);
+		SmartDashboard.putString("DB/String 5", "Offset: " + offset);
+		SmartDashboard.putString("DB/String 6", Double.toString(distance));
+		SmartDashboard.putString("DB/String 1", "Drive Distance " + driveDistance);
+		getEncoders();
+		
+		table.putNumber("offset m", 1.2);
+		
 		switch(CurrentAutoState) {
 		case START:
+			//Currently going to TURN because we haven't calibrated encoders for GO
 			CurrentAutoState = AutoState.GO;
 			break;
 		case GO:
-			//robot is 36 inches
-			// right was 24
-			gearPiss.set(DoubleSolenoid.Value.kForward);
-	
 			if(Starter == TurnDirection.RIGHT)
-				//87 inches b4 1:54 pm//78..5
-				autonDrive = 71.5;
+				autonDrive = 80;
 			else if(Starter == TurnDirection.LEFT)
-				//82 b4 1:54pm; 41
-				autonDrive = 67.5;
-			else if(Starter == TurnDirection.STRAIGHT){
-				//22.5
-				autonDrive = 48;
-			}
-			getEncoders();
-			
-				if((driveDistance ) <= autonDrive){
-				autoLeft = pidGyro.computeControl(0) + 0.55;
-				autoRight = (pidGyro.computeControl(0) + 0.55)*rightDToffset;
-/*				if(timer.get() < 3000){
-					
-				}*/
+				autonDrive = 80;
+			else if(Starter == TurnDirection.STRAIGHT)
+				autonDrive = 60;
+				getEncoders();
+				if((driveDistance + 18) <= autonDrive){
+				autoLeft = 0.5;
+				autoRight = 0.6 ;
 			} else {
 				autoRight = 0.0;
 				autoLeft = 0.0;
+				CurrentAutoState = AutoState.PLACE;
 				resetEncoders();
-				CurrentAutoState = AutoState.TURN;
-			
 			}
 			break;
 		case TURN:
-			if(Starter == TurnDirection.RIGHT){
-				autoLeft = 0.45;
-				autoRight = -(0.45 * rightDToffset);
+			
+			//found is true when the contours are within width height ratios and alignment specifications
+			if(found){
+				System.out.println("Tape Found? " + found);
+				autoLeft = 0.0;
+				autoRight = 0.0;
+				CurrentAutoState = AutoState.ALIGN;
+				resetEncoders();
+			} else if(Starter == TurnDirection.RIGHT){
+				autoLeft = 0.5;
+				autoRight = -(0.5 * rightDToffset);
 				}
 				else if(Starter == TurnDirection.LEFT){
-					autoLeft = -0.45;
-					autoRight = (0.45 * dpp);
+					autoLeft = -0.5;
+					autoRight = (0.5 * dpp);
 				}
-				else if(Starter == TurnDirection.STRAIGHT){
+				else{
 					autoLeft = 0;
 					autoRight = 0;
-					CurrentAutoState = AutoState.PLACE;
 				}
-			if(Starter == TurnDirection.RIGHT){
-				//49,45
-				if((imu.getYaw() > 49) || (imu.getYaw() < 45)){
-					autoLeft = pidGyro.computeControl(47);
-					autoRight = -(pidGyro.computeControl(47));
-					}
-				else{
-					autoLeft = 0.0;
-					autoRight = 0.0;
-					resetEncoders();
-					//timer.start();
-					CurrentAutoState = AutoState.PLACE;
-				}
-			}
-			else if(Starter == TurnDirection.LEFT){
-				//-47, 43, 47
-				if((imu.getYaw() < -48) || (imu.getYaw() > -44)){
-					autoLeft = pidGyro.computeControl(-46);
-					autoRight = -pidGyro.computeControl(-46);
-				}
-				else{
-					autoLeft = 0.0;
-					autoRight = 0.0;
-					resetEncoders();
-					//timer.start();
-					CurrentAutoState = AutoState.PLACE;
-				}
-					
-			}
-			else{
-				//timer.start();
-				CurrentAutoState = AutoState.PLACE;
-			}
+			;
 			break;
-/*		case ALIGN:
+		case ALIGN:
 			System.out.println(offset);
 			if(found){
 				System.out.println("Tape Found? " + found);
@@ -429,110 +380,56 @@ public class Robot extends IterativeRobot {
 					realign = false;
 				}
 			}
-				break;*/
+				break;
 		case PLACE:
-			getEncoders();
-			if(Starter != TurnDirection.STRAIGHT){
-				if(driveDistance <= 10 && Starter == TurnDirection.LEFT){
-					autoLeft = 0.5;
-					autoRight = 0.5 * rightDToffset;
-/*					if(timer.get()>=3.0){
-						
-						if(Math.abs(driveDistance) <=4.0){
-						autoLeft = -0.5;
-						autoRight = -0.5 * rightDToffset;
-						} else {
-							autoLeft = 0.0;
-							autoRight = 0.0;
-							gearPiss.set(DoubleSolenoid.Value.kReverse);
-							Timer.delay(1);
-							resetEncoders();
-
-							CurrentAutoState = AutoState.FINISH;
-						}
-					}*/
-				}
-				else if(driveDistance <= 5.0 && Starter == TurnDirection.RIGHT){
-					autoLeft = 0.5;
-					autoRight = 0.5 * rightDToffset;
-				}
-
-				else{autoLeft = 0.0;
-				autoRight = 0.0;
-				Timer.delay(1.0);
-				if(shoot)
-					gearPiss.set(DoubleSolenoid.Value.kReverse);
-				Timer.delay(1.5);
-				resetEncoders();
-
-				CurrentAutoState = AutoState.FINISH;
-				}
-			}
-				else{
+			System.out.println(offset);
+			if(Starter == TurnDirection.STRAIGHT){
 				autoLeft = 0.0;
 				autoRight = 0.0;
-				Timer.delay(1.0);
-				if(shoot)
-					gearPiss.set(DoubleSolenoid.Value.kReverse);
+				gearPiss.set(DoubleSolenoid.Value.kReverse);
 				Timer.delay(1);
-				resetEncoders();
 				CurrentAutoState = AutoState.FINISH;
+				resetEncoders();
+			}
+			/*if(offset.equals("centered")){
+				
+				//before 75, 88
+				if(64 <= distance && distance<=70){
+					autoLeft = 0.0;
+					autoRight = 0.0;
+					gearPiss.set(DoubleSolenoid.Value.kReverse);
+					Timer.delay(1);
+					CurrentAutoState = AutoState.FINISH;
+					resetEncoders();
+//					resetEncoders();
+				} else if (distance > 70.0){
+					autoLeft = 0.5 ;
+					autoRight = 0.5 * rightDToffset;
+				}else {
+					autoLeft = 0;
+					autoRight = 0;
 				}
+			}
+			else{
+				CurrentAutoState = AutoState.ALIGN;
+			}*/
 			break;
 		case FINISH:
 			gearPiss.set(DoubleSolenoid.Value.kForward);
-			getEncoders();
-			if((driveDistance >= -10) && shoot){
+		/*	if(Math.abs(driveDistance) < 10){
 				autoLeft = -0.5;
 				autoRight = -0.5   * rightDToffset;
-			}
-			else {
+			}*/
+			if(Math.abs(driveDistance) < 15){
+				autoLeft = -0.58;
+				autoRight = -0.6;
+			} else {
 				autoLeft = 0.0;
 				autoRight = 0.0;
-				if(Starter != TurnDirection.STRAIGHT){
-					if(imu.getYaw() > 2 || imu.getYaw() < -2){
-						autoLeft = pidGyro.computeControl(0);
-						autoRight = pidGyro.computeControl(0);
-					}
-
 			}
-			
-			}
-			if(feederAuton){
-				resetEncoders();
-				pidGyro.setSetpoint(0.0);
-				CurrentAutoState = AutoState.FEEDER;
-			}
-			break;
-		case FEEDER:
-			if(!(imu.getYaw() > -2) && !(imu.getYaw() < 2)){
-				autoLeft = pidGyro.computeControl(imu.getYaw());
-				autoRight = -pidGyro.computeControl(imu.getYaw());
-			}
-			else{
-				Timer.delay(1);
-				resetEncoders();
-				CurrentAutoState = AutoState.RUNNER;
-			}
-			break;
-		case RUNNER:
-			//autoLeft = 0;
-			//autoRight = 0;
-			//Timer.delay(1);
-			autoLeft = 0.9;
-			autoRight = 0.9;
-			if(driveDistance > 50){
-				autoLeft = 0;
-				autoRight = 0;
-//					CurrentAutoState = AutoState.FINISH;
-			}
-			break;
-		case DUMMY:
 			break;
 			}
 		drive.tankDrive(autoLeft, autoRight);
-		//System.out.println("Current: " + CurrentAutoState);
-		//System.out.println("distance "+ Math.abs(driveDistance));
 		SmartDashboard.putString("DB/String 9", Integer.toString(rightEncoder.get()));
 		SmartDashboard.putString("DB/String 2", "Encoder Distance: " + driveDistance);
 		SmartDashboard.putString("DB/String 1", "Current Autonomous State: " + CurrentAutoState);
@@ -541,14 +438,12 @@ public class Robot extends IterativeRobot {
 		SmartDashboard.putString("DB/String 5", "Offset: " + offset);
 		SmartDashboard.putString("DB/String 6", "DistanceA: " + distance);
 		SmartDashboard.putString("DB/String 8", "State" + CurrentAutoState);
-		
-		System.out.println("R Encoder "+rightEncoder.get());
-		System.out.println("L Encoder "+leftEncoder.get());
+		SmartDashboard.putString("DB/String 7", "PID "+ pidVision.computeControl(center));
 		//drive.mecanumDrive_Polar(0, 0, pidGyro.computeControl(imu.getYaw()));
 		//drive.tankDrive(-pidGyro.computeControl(imu.getYaw()), pidGyro.computeControl(imu.getYaw()));
 		//System.out.println(pidGyro.computeControl(imu.getYaw()));
 		
-		//System.out.println(driveDistance);
+		System.out.println(driveDistance);
 	}
 	
 
@@ -562,11 +457,48 @@ public class Robot extends IterativeRobot {
 			autonomousCommand.cancel();
 		
 		pidGyro.setSetpoint(0.0);
-		resetEncoders();
-		CurrentAutoState = AutoState.START;
-		 leftDrive = 0.0;
-		 rightDrive = 0.0;
 		
+		CurrentAutoState = AutoState.START;
+		
+//		Thread t = new Thread(() -> {
+//		//start Cameras
+//			
+//			boolean allowCamFront = true;
+//		UsbCamera frontCam = CameraServer.getInstance().startAutomaticCapture(0);
+//		UsbCamera backCam = CameraServer.getInstance().startAutomaticCapture(1);
+//		frontCam.setResolution(320,240);
+//		frontCam.setFPS(30);
+//		backCam.setResolution(320, 240);
+//		backCam.setFPS(30);
+//		CvSink frontSink = CameraServer.getInstance().getVideo(frontCam);
+//        CvSink backSink = CameraServer.getInstance().getVideo(backCam);
+//        CvSource outputStream = CameraServer.getInstance().putVideo("Switcher", 320, 240);
+//        
+//        Mat image = new Mat();
+//        
+//        while(!Thread.interrupted()){
+//            if(joy.getRawButton(4)) {
+//        		allowCamFront = !allowCamFront;
+//        	}
+//        	
+//            if(allowCamFront){
+//              backSink.setEnabled(false);
+//              frontSink.setEnabled(true);
+//              frontSink.grabFrame(image);
+//            } else{
+//              frontSink.setEnabled(false);
+//              backSink.setEnabled(true);
+//              backSink.grabFrame(image);     
+//            }
+//            
+//            outputStream.putFrame(image);
+//        }
+//        
+//        
+//		});
+//		t.start();
+		UsbCamera cam0 = CameraServer.getInstance().startAutomaticCapture(0);
+		UsbCamera cam1 = CameraServer.getInstance().startAutomaticCapture(1);
 	}
 
 	/**
@@ -574,36 +506,32 @@ public class Robot extends IterativeRobot {
 	 */
 	@Override
 	public void teleopPeriodic() {
-		System.out.println("Button: " + SmartDashboard.getBoolean("DB/Button 0",false));
-		rightDrive = -joy.getRawAxis(3);
-		if(-joy.getRawAxis(1) <= .3 && -joy.getRawAxis(1) >=-.3) {
-			leftDrive = 0.0;
-		}
-		else{
-			leftDrive = -joy.getRawAxis(1);
-		}
-		//turbo
+		
+		
+		distance = table.getNumber("distance", 100);
+		System.out.println(found);
+		getEncoders();
+		table.putNumber("offset m", 1.8);
+		capturing = table.getBoolean("capturing", false);
+		System.out.println(capturing);
+		
 		if(joy.getRawButton(5)){
 			drivePower = 1;
-		} else if(joy.getRawButton(8)){
-			drivePower = 0.5f;
-		} else{
+		}
+		else{
 			drivePower=.8f;
 		}
 		Scheduler.getInstance().run();
+		drive.tankDrive((-joy.getRawAxis(1) * drivePower), (-joy.getRawAxis(5) * rightDToffset) * drivePower);
 		
-		drive.tankDrive(((leftDrive * leftTeleopOffset) * drivePower), (rightDrive * 1) * drivePower);
 		
-		
-		System.out.println(fR.get());
-		System.out.println(fL.get());
 		//Straight driving
 		if (joy.getRawButton(6)) {
 			if(zeroGyro){
 				imu.zeroYaw();
 				zeroGyro = false;
 			}
-			drive.tankDrive((rightDrive - pidGyro.computeControl(imu.getYaw())) * drivePower, rightDrive * drivePower);
+			drive.tankDrive((-joy.getRawAxis(5) - pidGyro.computeControl(imu.getYaw())) * drivePower, -joy.getRawAxis(5) * drivePower);
 			
 			
 		}
@@ -611,7 +539,7 @@ public class Robot extends IterativeRobot {
 		
 		//Backwards driving
 		if (joy.getRawButton(3)) {
-			drive.tankDrive((leftDrive * offsetFactor) * drivePower, rightDrive * drivePower);
+			drive.tankDrive((joy.getRawAxis(1) * offsetFactor) * drivePower, joy.getRawAxis(5) * drivePower);
 			
 			//Backwards and Straight
 			if (joy.getRawButton(6)) {
@@ -619,7 +547,7 @@ public class Robot extends IterativeRobot {
 					imu.zeroYaw();
 					zeroGyro = false;
 				}
-				drive.tankDrive((leftDrive * offsetFactor) * drivePower, leftDrive * drivePower);
+				drive.tankDrive((joy.getRawAxis(1) * offsetFactor) * drivePower, joy.getRawAxis(1) * drivePower);
 			}
 		}
 		
@@ -640,38 +568,26 @@ public class Robot extends IterativeRobot {
 		}
 		
 		//Climber controls
-/*		if(opjoy.getRawButton(3)){
-			c1.set(0.9);
-			c2.set(0.9);
-		}*/
-		
 		if(opjoy.getRawButton(3)) {
-/*			if(0.5 > opjoy.getRawAxis(1) && opjoy.getRawAxis(1) > 0){
-			c1.set(0.9 * (1.1 - opjoy.getRawAxis(1))); 
-			c2.set(0.9 * (1.1 - opjoy.getRawAxis(1)));
-			}
-			else if(opjoy.getRawAxis(1) >= 0.5){
-			c1.set(0.5);
-			c2.set(0.5);
-			}
-			else{
-			c1.set(0.9);
-			c2.set(0.9);
-			}*/
-			c1.set(1.0);
-			c2.set(1.0);
+			c1.set(0.4); 
+			c2.set(0.4);
 		} else {
 			c1.set(0); 
 			c2.set(0);
 		}
 		
 		
+		//i commented this out cuz idk wot it duz
 		//gearPiss.set(DoubleSolenoid.Value.kForward);
 	
 		
 
 		testTime++;
-
+		//table.putNumber("time", testTime);
+		//System.out.println(testTime);
+		//System.out.println("Found?" + found + "offset?" + offset + "distance" + distance);
+		
+		//System.out.println("Gyro: " + imu.getYaw());
 		System.out.println("Left Joy: " + joy.getRawAxis(1) + "Right Joy: " + joy.getRawAxis(5));
 		if(joy.getRawButton(1)){
 			resetEncoders();
@@ -681,6 +597,7 @@ public class Robot extends IterativeRobot {
 		
 		
 		
+		//334 inches
 		SmartDashboard.putString("DB/String 1", "Left Encoder");
 		SmartDashboard.putString("DB/String 6", Double.toString(-leftEncoder.get()));
 		
@@ -692,16 +609,17 @@ public class Robot extends IterativeRobot {
 
 		SmartDashboard.putString("DB/String 3", "Gyro Angle");
 		SmartDashboard.putString("DB/String 8", Double.toString(imu.getYaw()));
-		System.out.println("R Encoder "+rightEncoder.get());
-		System.out.println("L Encoder "+leftEncoder.get());
-		System.out.println("Gyro: " + Double.toString(imu.getYaw()));
-
-/*		
-		System.out.println("Current 0 " + pdp.getCurrent(0));
-		System.out.println("Current 1 " + pdp.getCurrent(1));
-		System.out.println("Current 2 " + pdp.getCurrent(2));
-		System.out.println("Current 12 " + pdp.getCurrent(12));*/
+		
 		//System.out.println("Distance" + distance );
+		
+		found = table.getBoolean("found", false);
+		offset = table.getString("offset", "default");
+		distance = table.getNumber("distance", 60.0);
+		capturing = table.getBoolean("capturing", false);
+		center = table.getNumber("center", 10);
+		
+		System.out.println("offset " + offset);
+		System.out.println("distance" + distance);
 	}
 
 	/**
@@ -710,15 +628,21 @@ public class Robot extends IterativeRobot {
 	@Override
 	public void testPeriodic() {
 		LiveWindow.run();
-
+		found = table.getBoolean("found", false);
+		offset = table.getString("offset", "default");
+		distance = table.getNumber("distance", 100.0);
+		capturing = table.getBoolean("capturing", false);
+		
+		SmartDashboard.putString("DB/String 4", "Found: " + found);
+		SmartDashboard.putString("DB/String 5", "Offset: " + offset);
+		SmartDashboard.putString("DB/String 6", "Distance Away: " + distance);
+		SmartDashboard.putString("DB/String 1", "Capturing: " + capturing);
 	}
 	public void getEncoders(){
 		leftCount = -leftEncoder.get();
 		rightCount = rightEncoder.get();
 		
 		driveDistance = ((leftCount + rightCount)/2)/dpp;
-		//driveDistance = ((rightCount))/dpp;
-
 	}
 	public void resetEncoders(){
 		leftCount = 0;
@@ -733,5 +657,4 @@ public class Robot extends IterativeRobot {
 
 		
 	}
-
 }
